@@ -5,6 +5,19 @@ from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse
+from app.services.email_service import send_otp_email
+
+from app.schemas.otp import (
+    OTPVerify,
+    OTPRequest,
+    OTPResponse
+)
+
+from app.services.otp_service import (
+    create_otp,
+    verify_otp,
+    resend_otp
+)
 
 
 router = APIRouter(
@@ -18,7 +31,7 @@ router = APIRouter(
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED
 )
-def register(
+async def register(
     user_data: UserCreate,
     db: Session = Depends(get_db)
 ):
@@ -45,4 +58,98 @@ def register(
     db.commit()
     db.refresh(new_user)
 
+    otp_code = create_otp(db, new_user)
+
+    await send_otp_email(
+        recipient_email=new_user.email,
+        otp_code=otp_code
+    )
+
     return new_user
+
+
+
+@router.post(
+    "/verify-otp",
+    response_model=OTPResponse
+)
+def verify_email_otp(
+    otp_data: OTPVerify,
+    db: Session = Depends(get_db)
+):
+    user = (
+        db.query(User)
+        .filter(User.email == otp_data.email)
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    if user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already verified"
+        )
+
+    is_valid = verify_otp(
+        db=db,
+        user=user,
+        otp_code=otp_data.otp_code
+    )
+
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP"
+        )
+
+    return {
+        "message": "Email verified successfully"
+    }
+
+
+@router.post(
+    "/resend-otp",
+    response_model=OTPResponse
+)
+async def resend_email_otp(
+    otp_data: OTPRequest,
+    db: Session = Depends(get_db)
+):
+    user = (
+        db.query(User)
+        .filter(User.email == otp_data.email)
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    if user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already verified"
+        )
+
+    # Generate new OTP and invalidate previous OTPs
+    otp_code = resend_otp(
+        db=db,
+        user=user
+    )
+
+    # Send new OTP by email
+    await send_otp_email(
+        recipient_email=user.email,
+        otp_code=otp_code
+    )
+
+    return {
+        "message": "A new OTP has been sent to your email"
+    }

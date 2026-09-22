@@ -147,13 +147,13 @@ Task Manager API/
 ## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
+https://github.com/Shorifuzzaman-Git/Task-Manager-API.git
 ```
 
 Move into the project:
 
 ```bash
-cd "Task Manager API"
+cd Task-Manager-API
 ```
 
 ---

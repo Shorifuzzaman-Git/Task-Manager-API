@@ -1,6 +1,13 @@
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
+
+
+class TaskStatus(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
 
 
 class TaskCreate(BaseModel):
@@ -11,14 +18,14 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
-    status: str | None = None
+    status: TaskStatus | None = None
 
 
 class TaskResponse(BaseModel):
     id: int
     title: str
     description: str | None
-    status: str
+    status: TaskStatus
     user_id: int
     created_at: datetime
     updated_at: datetime
